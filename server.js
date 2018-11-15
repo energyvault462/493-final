@@ -251,13 +251,6 @@ router.post('/pets', function(req, res){
 
 });
 
-/*
-router.post('/pets', function(req, res){
-    //console.log(req.body);
-    post_pet(req.body.name, req.body.breed, req.body.color)
-    .then( key => {res.status(200).send('{ "id": ' + key.id + ' }')} );
-});
-*/
 
 router.delete('/pets/:id', function(req, res){
 	//console.log("delete pets " + req.params.id);
@@ -277,15 +270,12 @@ router.delete('/pets/:id', function(req, res){
 			//return entities[0].map(fromDatastore);
 			return kennel;
 		})
-	.then(delete_pet(req.params.id).then(res.status(200).end()));
+	.then(delete_pet(req.params.id).then(res.status(204).end()));
 });
 
-
-
-router.delete('/petsHardDelete/:id', function(req, res){
-	 // Deletes a pet w/out checking if it's docked. Used for troubleshooting
-	 //console.log("delete pets" + req.params.id);
-    delete_pet(req.params.id).then(res.status(200).end())
+router.delete('/pets', function(req, res){
+	res.set('Accept', "GET, POST");
+   res.status(405).end();
 });
 
 router.put('/pets/:id', function(req, res){
@@ -457,6 +447,16 @@ router.delete('/pets/:sid/kennel/:cid', function(req, res){
 	      put_kennel(data)
 	      .then(res.status(200).end());
 	});
+});
+
+router.delete('/kennels', function(req, res){
+	res.set('Accept', "GET, POST");
+   res.status(405).end();
+});
+
+router.delete('/users', function(req, res){
+	res.set('Accept', "GET, POST");
+   res.status(405).end();
 });
 
 /* ------------- End Controller Functions ------------- */

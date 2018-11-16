@@ -75,6 +75,7 @@ function get_one_pet(req){
 	return datastore.get(key).then( (entities) => {
 			results = entities.map(fromDatastore);
 			results[0].self = req.protocol + "://" + req.get("host") + "/pets/" + results[0].id;
+			results[0].base = req.protocol + "://" + req.get("host") + "/pets";
 			return results;
 		});
 }
@@ -141,6 +142,7 @@ function get_one_kennel(req){
 	return datastore.get(key).then( (entities) => {
 			results = entities.map(fromDatastore);
 			results[0].self = req.protocol + "://" + req.get("host") + "/kennels/" + results[0].id;
+			results[0].base = req.protocol + "://" + req.get("host") + "/kennels";
 			return results;
 		});
 }

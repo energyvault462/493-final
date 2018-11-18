@@ -155,15 +155,22 @@ function get_one_kennel(req, id){
 }
 
 
-function put_kennel(id, number, size, desc, pet_id){
+function put_kennel(req, id, number, size, desc, pet_id){
    const key = datastore.key([KENNEL, parseInt(id,10)]);
    let updated_kennel;
 
-   if(pet_id === "")
+   if(!pet_id || pet_id === "")
    {
-   	console.log("put_kennel() -- need to delete pet's kennel id")
+   	console.log("Using this one");
+   	updated_kennel = {"number": number, "size": size, "desc": desc}; 
    }
-	updated_kennel = {"number": number, "size": size, "desc": desc, "pet_id": pet_id}; 
+   else
+   {
+   	console.log("else Using this one");
+   	var pet_link = req.protocol + "://" + req.get("host") + "/pets/" + pet_id;
+   	updated_kennel = {"number": number, "size": size, "desc": desc, "pet_id": pet_id, "pet_link": pet_link}; 	
+   }
+	
 	//console.log(updated_kennel);
    return datastore.save({"key":key, "data":updated_kennel}).then(() => {return key});
 }
@@ -242,7 +249,7 @@ router.delete('/pets/:id', function(req, res){
 					data.content = arrayItem.content;
 					data.delivery_date = arrayItem.delivery_date;
 					data.weight = arrayItem.weight;
-					put_kennel(data);
+					put_kennel(req, data);
 
 				}); 
 			//return entities[0].map(fromDatastore);
@@ -360,7 +367,7 @@ router.delete('/kennels/:id', function(req, res){
 					data.content = arrayItem.content;
 					data.delivery_date = arrayItem.delivery_date;
 					data.weight = arrayItem.weight;
-					put_kennel(data);
+					put_kennel(req, data);
 
 				}); 
 			//return entities[0].map(fromDatastore);
@@ -377,7 +384,7 @@ router.put('/kennels/:id', function(req, res){
     else
     {
         res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/kennels/' + req.params.id);
-        put_kennel(req.params.id, req.body.number, req.body.size, req.body.desc, "")
+        put_kennel(req, req.params.id, req.body.number, req.body.size, req.body.desc, "")
         .then(res.status(200).end());
     }
 
@@ -407,7 +414,7 @@ router.patch('/kennels/:id', function(req, res){
 			  desc=req.body.desc;
 			} 
 			res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/kennels/' + req.params.id);
-	      put_kennel(req.params.id, number, size, desc, "")
+	      put_kennel(req, req.params.id, number, size, desc, "")
 	      .then(res.status(200).end());
     });
 });
@@ -432,7 +439,7 @@ router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
 		.then( (kennels) => {
 			if(!kennels[0].petid || kennels[0].petid === "")
 			{
-		      put_kennel(req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
+		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
 		      .then(set_pet_status(req, req.params.pet_id, kennels[0].number))
 		      .then(res.status(200).end());
 			}

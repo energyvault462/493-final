@@ -18,14 +18,16 @@ const Datastore = require('@google-cloud/datastore');
 
 const projectId = 'final-493';
 
+const PET = "Pet";
+const KENNEL = "Kennel";
+
 datastore = new Datastore({projectId:projectId});
 fromDatastore = function fromDatastore(item){
     item.id = item[Datastore.KEY].id;
     return item;
 }
 
-const PET = "Pet";
-const KENNEL = "Kennel";
+
 
 const router = express.Router();
 
@@ -161,12 +163,12 @@ function put_kennel(req, id, number, size, desc, pet_id){
 
    if(!pet_id || pet_id === "")
    {
-   	console.log("Using this one");
+   	//console.log("Using this one");
    	updated_kennel = {"number": number, "size": size, "desc": desc}; 
    }
    else
    {
-   	console.log("else Using this one");
+   	//console.log("else Using this one");
    	var pet_link = req.protocol + "://" + req.get("host") + "/pets/" + pet_id;
    	updated_kennel = {"number": number, "size": size, "desc": desc, "pet_id": pet_id, "pet_link": pet_link}; 	
    }
@@ -180,7 +182,7 @@ function delete_kennel(id){
 }
 
 function set_pet_status(req, id, status){
-
+	//console.log("set_pet_status id: " + id);
     const key = datastore.key([PET, parseInt(id,10)]);
 	 const pets = get_one_pet(req, id)
 	.then( (pets) => {
@@ -354,10 +356,36 @@ router.post('/kennels', function(req, res){
 
 
 router.delete('/kennels/:id', function(req, res){
+	    const kennels = get_one_kennel(req, req.params.id)
+		.then( (kennels) => {
+        //Get the data from this ship
+        var petid = kennels[0].pet_id;
+        console.log(kennels);
+
+        // check if docked or not, and act acordingly
+
+			if(!petid || petid == "")
+			{
+				// slip is empty, delete it.
+				//console.log("slip empty -- delete it");
+			  	delete_kennel(req.params.id).then(res.status(204).end())
+			}
+			else
+			{
+				//Slip has a boat, set boat to at sea.
+				//console.log("slip not empty, set boat to at sea: " + current_boat);
+				//set_ship_status(current_boat, "")
+				//console.log("delete /kenels/id - petid: " + petid);
+				delete_kennel(req.params.id)
+				.then(set_pet_status(req,petid, ""))
+				.then(res.status(204).end());
+			}
+		});
+
 	//console.log("delete kennels " + req.params.id);
+	/*
 	var q = datastore.createQuery(KENNEL).filter('carrier', '=', req.params.id);
 	var data = [];
-	//console.log (q);
 		return datastore.runQuery(q).then( (entities) => {
 				kennel = entities[0].map(fromDatastore)
 				kennel.forEach(function (arrayItem) {
@@ -372,6 +400,8 @@ router.delete('/kennels/:id', function(req, res){
 			return kennel;
 		})
 	.then(delete_kennel(req.params.id).then(res.status(204).end()));
+	*/
+
 });
 
 

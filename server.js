@@ -70,8 +70,8 @@ function get_pets(req){
 }
 
 
-function get_one_pet(req){
-	const key = datastore.key([PET, parseInt(req.params.id,10)]);
+function get_one_pet(req, id){
+	const key = datastore.key([PET, parseInt(id,10)]);
 	return datastore.get(key).then( (entities) => {
 			results = entities.map(fromDatastore);
 			results[0].self = req.protocol + "://" + req.get("host") + "/pets/" + results[0].id;
@@ -81,11 +81,18 @@ function get_one_pet(req){
 }
 
 
-function put_pet(id, name, breed, desc){
+function put_pet(id, name, breed, desc, status){
    const key = datastore.key([PET, parseInt(id,10)]);
    let updated_pet;
 
-	updated_pet = {"name": name, "breed": breed, "desc": desc}; 
+   if(status && status !== "")
+   {
+   	updated_pet = {"name": name, "breed": breed, "desc": desc, "status": status}; 
+   }
+   else
+   {
+   	updated_pet = {"name": name, "breed": breed, "desc": desc}; 
+   }
 	console.log(updated_pet);
    return datastore.save({"key":key, "data":updated_pet}).then(() => {return key});
 }
@@ -137,8 +144,9 @@ function get_kennels(req){
 }
 
 
-function get_one_kennel(req){
-	const key = datastore.key([KENNEL, parseInt(req.params.id,10)]);
+function get_one_kennel(req, id){
+	console.log(id);
+	const key = datastore.key([KENNEL, parseInt(id,10)]);
 	return datastore.get(key).then( (entities) => {
 			results = entities.map(fromDatastore);
 			results[0].self = req.protocol + "://" + req.get("host") + "/kennels/" + results[0].id;
@@ -148,11 +156,15 @@ function get_one_kennel(req){
 }
 
 
-function put_kennel(id, number, size, desc){
+function put_kennel(id, number, size, desc, pet_id){
    const key = datastore.key([KENNEL, parseInt(id,10)]);
    let updated_kennel;
 
-	updated_kennel = {"number": number, "size": size, "desc": desc}; 
+   if(pet_id === "")
+   {
+   	console.log("put_kennel() -- need to delete pet's kennel id")
+   }
+	updated_kennel = {"number": number, "size": size, "desc": desc, "pet_id": pet_id}; 
 	console.log(updated_kennel);
    return datastore.save({"key":key, "data":updated_kennel}).then(() => {return key});
 }
@@ -161,6 +173,17 @@ function delete_kennel(id){
 	//console.log("delete_kennel: " + id)
     const key = datastore.key([KENNEL, parseInt(id,10)]);
     return datastore.delete(key);
+}
+
+function set_pet_status(req, id, status){
+
+    const key = datastore.key([PET, parseInt(id,10)]);
+	 const pets = get_one_pet(req, id)
+	.then( (pets) => {
+			put_pet(id, pets[0].name, pets[0].breed, pets[0].desc, status)
+	      .then(() => {return key});
+	    });
+    //return datastore.delete(key);
 }
 
 /* ------------- End Model Functions ------------- */
@@ -182,7 +205,7 @@ router.get('/pets', function(req, res){
 });
 
 router.get('/pets/:id', function(req, res){
-	    const pets = get_one_pet(req)
+	    const pets = get_one_pet(req, req.params.id)
 	.then( (pets) => {
         const accepts = req.accepts(['application/json']);
         if(!accepts){
@@ -243,12 +266,20 @@ router.put('/pets/:id', function(req, res){
 });
 
 router.patch('/pets/:id', function(req, res){
-	    const pets = get_one_pet(req)
+	    const pets = get_one_pet(req, req.params.id)
 		.then( (pets) => {
         //Get the data from this pet
         var name = pets[0].name;
         var breed = pets[0].breed;
         var desc = pets[0].desc;
+        if (typeof pets[0].status  !== "undefined" && pets[0].status !== "")
+        {
+        		var status = pets[0].status;
+        }
+        else
+        {
+        		var status = "";
+        }
 
         // if it's been changed, change it.
 			if(typeof req.body.name !== "undefined")
@@ -265,8 +296,12 @@ router.patch('/pets/:id', function(req, res){
 			{
 			  desc=req.body.desc;
 			} 
+			if(typeof req.body.status !== "undefined")
+			{
+			  status=req.body.status;
+			} 
 			res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/pets/' + req.params.id);
-	      put_pet(req.params.id, name, breed, desc)
+	      put_pet(req.params.id, name, breed, desc, status)
 	      .then(res.status(200).end());
     });
 });
@@ -287,7 +322,7 @@ router.get('/kennels', function(req, res){
 });
 
 router.get('/kennels/:id', function(req, res){
-	    const kennels = get_one_kennel(req)
+	    const kennels = get_one_kennel(req, req.params.id)
 	.then( (kennels) => {
         const accepts = req.accepts(['application/json']);
         if(!accepts){
@@ -351,7 +386,7 @@ router.put('/kennels/:id', function(req, res){
 
 router.patch('/kennels/:id', function(req, res){
 		console.log(req.body.number);
-	    const kennels = get_one_kennel(req)
+	    const kennels = get_one_kennel(req, req.params.id)
 		.then( (kennels) => {
         //Get the data from this pet
         var number = kennels[0].number;
@@ -374,7 +409,7 @@ router.patch('/kennels/:id', function(req, res){
 			  desc=req.body.desc;
 			} 
 			res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/kennels/' + req.params.id);
-	      put_kennel(req.params.id, number, size, desc)
+	      put_kennel(req.params.id, number, size, desc, "")
 	      .then(res.status(200).end());
     });
 });
@@ -391,11 +426,31 @@ router.delete('/kennels', function(req, res){
    res.status(405).end();
 });
 
+router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
+	    const kennels = get_one_kennel(req, req.params.kennel_id)
+
+		.then( (kennels) => {
+			if(!kennels[0].petid || kennels[0].petid === "")
+			{
+		      put_kennel(req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
+		      .then(set_pet_status(req, req.params.pet_id, req.params.kennel_id))
+		      .then(res.status(200).end());
+			}
+			else
+			{
+				console.log("put /pets/:pet_id/kennels/:kennel_id  -- else for kennels[0].petid === <double quotes>")
+				res.status(403).end();
+			}
+    });
+});
+
 //   USERS
 router.delete('/users', function(req, res){
 	res.set('Accept', "GET, POST");
    res.status(405).end();
 });
+
+
 
 
 

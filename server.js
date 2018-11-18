@@ -93,7 +93,7 @@ function put_pet(id, name, breed, desc, status){
    {
    	updated_pet = {"name": name, "breed": breed, "desc": desc}; 
    }
-	console.log(updated_pet);
+	//console.log(updated_pet);
    return datastore.save({"key":key, "data":updated_pet}).then(() => {return key});
 }
 
@@ -145,7 +145,6 @@ function get_kennels(req){
 
 
 function get_one_kennel(req, id){
-	console.log(id);
 	const key = datastore.key([KENNEL, parseInt(id,10)]);
 	return datastore.get(key).then( (entities) => {
 			results = entities.map(fromDatastore);
@@ -165,7 +164,7 @@ function put_kennel(id, number, size, desc, pet_id){
    	console.log("put_kennel() -- need to delete pet's kennel id")
    }
 	updated_kennel = {"number": number, "size": size, "desc": desc, "pet_id": pet_id}; 
-	console.log(updated_kennel);
+	//console.log(updated_kennel);
    return datastore.save({"key":key, "data":updated_kennel}).then(() => {return key});
 }
 
@@ -385,7 +384,6 @@ router.put('/kennels/:id', function(req, res){
 });
 
 router.patch('/kennels/:id', function(req, res){
-		console.log(req.body.number);
 	    const kennels = get_one_kennel(req, req.params.id)
 		.then( (kennels) => {
         //Get the data from this pet
@@ -427,21 +425,24 @@ router.delete('/kennels', function(req, res){
 });
 
 router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
-	    const kennels = get_one_kennel(req, req.params.kennel_id)
-
+	const pets = get_one_pet(req, req.params.pet_id)
+	.then ( (pets) => {
+		//console.log(pets);
+	   const kennels = get_one_kennel(req, req.params.kennel_id)
 		.then( (kennels) => {
 			if(!kennels[0].petid || kennels[0].petid === "")
 			{
 		      put_kennel(req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
-		      .then(set_pet_status(req, req.params.pet_id, req.params.kennel_id))
+		      .then(set_pet_status(req, req.params.pet_id, kennels[0].number))
 		      .then(res.status(200).end());
 			}
 			else
 			{
-				console.log("put /pets/:pet_id/kennels/:kennel_id  -- else for kennels[0].petid === <double quotes>")
+				//console.log("put /pets/:pet_id/kennels/:kennel_id  -- else for kennels[0].petid === <double quotes>")
 				res.status(403).end();
 			}
-    });
+    	});
+   });
 });
 
 //   USERS

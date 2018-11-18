@@ -163,12 +163,12 @@ function put_kennel(req, id, number, size, desc, pet_id){
 
    if(!pet_id || pet_id === "")
    {
-   	//console.log("Using this one");
+   	console.log("put_kennel - no pet id");
    	updated_kennel = {"number": number, "size": size, "desc": desc}; 
    }
    else
    {
-   	//console.log("else Using this one");
+   	console.log("put_kennel - HAS pet id");
    	var pet_link = req.protocol + "://" + req.get("host") + "/pets/" + pet_id;
    	updated_kennel = {"number": number, "size": size, "desc": desc, "pet_id": pet_id, "pet_link": pet_link}; 	
    }
@@ -239,17 +239,18 @@ router.post('/pets', function(req, res){
 
 router.delete('/pets/:id', function(req, res){
 	//console.log("delete pets " + req.params.id);
-	var q = datastore.createQuery(KENNEL).filter('carrier', '=', req.params.id);
+	// TODO: FIX THIS part. it's not finding anything in filter and I have no idea why
+	var q = datastore.createQuery(KENNEL).filter('pet_id', '=', req.params.id);
 	var data = [];
 	//console.log (q);
 		return datastore.runQuery(q).then( (entities) => {
 				kennel = entities[0].map(fromDatastore)
 				kennel.forEach(function (arrayItem) {
-					data.id = arrayItem.id;
-					data.content = arrayItem.content;
-					data.delivery_date = arrayItem.delivery_date;
-					data.weight = arrayItem.weight;
-					put_kennel(req, data);
+					data.number = arrayItem.number;
+					data.size = arrayItem.size;
+					data.desc = arrayItem.desc;
+					//put_kennel(req, req.params.id, req.body.number, req.body.size, req.body.desc, "")
+					put_kennel(req, data.number, data.size, data.desc, "");
 
 				}); 
 			//return entities[0].map(fromDatastore);
@@ -381,26 +382,6 @@ router.delete('/kennels/:id', function(req, res){
 				.then(res.status(204).end());
 			}
 		});
-
-	//console.log("delete kennels " + req.params.id);
-	/*
-	var q = datastore.createQuery(KENNEL).filter('carrier', '=', req.params.id);
-	var data = [];
-		return datastore.runQuery(q).then( (entities) => {
-				kennel = entities[0].map(fromDatastore)
-				kennel.forEach(function (arrayItem) {
-					data.id = arrayItem.id;
-					data.content = arrayItem.content;
-					data.delivery_date = arrayItem.delivery_date;
-					data.weight = arrayItem.weight;
-					put_kennel(req, data);
-
-				}); 
-			//return entities[0].map(fromDatastore);
-			return kennel;
-		})
-	.then(delete_kennel(req.params.id).then(res.status(204).end()));
-	*/
 
 });
 

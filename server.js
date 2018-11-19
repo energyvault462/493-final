@@ -281,7 +281,7 @@ router.get('/pets', function(req, res){
 });
 
 router.get('/pets/:id', function(req, res){
-	    const pets = get_one_pet(req, req.params.id)
+	const pets = get_one_pet(req, req.params.id)
 	.then( (pets) => {
         const accepts = req.accepts(['application/json']);
         if(!accepts){
@@ -531,21 +531,27 @@ router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
    });
 });
 
+router.get('/kennels/:id/pets', function(req, res){
+	const kennels = get_one_kennel(req, req.params.id)
+	.then( (kennels) => {
+		if (kennels[0].pet_id && kennels[0].pet_id !== "")
+		{
+			const pets = get_one_pet(req, kennels[0].pet_id)
+			.then( (pets) => {
+	        	const accepts = req.accepts(['application/json']);
+	        	if(!accepts){
+	            	res.status(406).send('Not Acceptable');
+	        	} else if(accepts === 'application/json'){
+	            	res.status(200).json(pets);
+	        	} else { res.status(500).send('Content type got messed up!'); }
+	    });
+		}
+		else
+		{
+			res.status(406).send('No Pet in Kennel');
+		}
 
-router.delete('/pets/:pet_id/kennels/:kennel_id', function(req, res){
-	    const kennels = get_one_kennel(req, req.params.kennel_id)
-		.then( (kennels) => {
-			if(kennels[0].petid == "")
-			{
-				res.status(403).end();
-			}
-			else
-			{
-		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, "")
-		      .then(set_pet_status(req, req.params.pet_id, ""))
-		      .then(res.status(200).end());
-			}
-    });
+   });
 });
 
 //   USERS
@@ -670,18 +676,6 @@ router.delete('/users', function(req, res){
 
 
 
-
-
-
-/*
-router.get('/kennels/:id/pets', function(req, res){
-	// gets the pet info for this kennel
-    const kennel = get_kennel_in_pet(req, req.params.id)
-	.then( (kennel) => {
-        res.status(200).json(kennel);
-    });
-});
-*/
 
 /* ------------- End Controller Functions ------------- */
 

@@ -674,7 +674,8 @@ router.delete('/users', function(req, res){
 
 
 /*
-router.get('/pets/:id/kennel', function(req, res){
+router.get('/kennels/:id/pets', function(req, res){
+	// gets the pet info for this kennel
     const kennel = get_kennel_in_pet(req, req.params.id)
 	.then( (kennel) => {
         res.status(200).json(kennel);

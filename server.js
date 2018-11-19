@@ -256,6 +256,12 @@ function put_user(id, email, first, last, status){
    return datastore.save({"key":key, "data":updated_user}).then(() => {return key});
 }
 
+function delete_user(id){
+	//console.log("delete_user: " + id)
+    const key = datastore.key([USER, parseInt(id,10)]);
+    return datastore.delete(key);
+}
+
 /* ------------- End Model Functions ------------- */
 
 /* ------------- Begin Controller Functions ------------- */
@@ -597,7 +603,65 @@ router.put('/users/:id', function(req, res){
 
 });
 
+router.patch('/users/:id', function(req, res){
+	    const users = get_one_user(req, req.params.id)
+		.then( (users) => {
+        //Get the data from this users
+        var email = users[0].email;
+        var first = users[0].first;
+        var last = users[0].last;
+        if (typeof users[0].status  !== "undefined" && users[0].status !== "")
+        {
+        		var status = users[0].status;
+        }
+        else
+        {
+        		var status = "";
+        }
 
+        // if it's been changed, change it.
+			if(typeof req.body.email !== "undefined")
+			{
+			  email=req.body.email;
+			} 
+
+			if(typeof req.body.first !== "undefined")
+			{
+			  first=req.body.first;
+			} 
+
+			if(typeof req.body.last !== "undefined")
+			{
+			  last=req.body.last;
+			} 
+			if(typeof req.body.status !== "undefined")
+			{
+			  status=req.body.status;
+			} 
+			res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/users/' + req.params.id);
+	      put_user(req.params.id, email, first, last, status)
+	      .then(res.status(200).end());
+    });
+});
+
+router.delete('/users/:id', function(req, res){
+	//console.log("delete users " + req.params.id);
+	var q = datastore.createQuery(PET).filter('owner', '=', req.params.id);
+	var data = [];
+	//console.log (q);
+		return datastore.runQuery(q).then( (entities) => {
+				pet = entities[0].map(fromDatastore)
+				pet.forEach(function (arrayItem) {
+					data.name = arrayItem.name;
+					data.breed = arrayItem.breed;
+					data.desc = arrayItem.desc;
+					put_pet(req, data.name, data.breed, data.desc, "");
+				}); 
+			//return entities[0].map(fromDatastore);
+			return pet;
+		})
+	.then(delete_user(req.params.id).then(res.status(204).end()));
+});
 
 router.delete('/users', function(req, res){
 	res.set('Accept', "GET, POST");
@@ -621,6 +685,12 @@ router.get('/pets/:id/kennel', function(req, res){
 /* ------------- End Controller Functions ------------- */
 
 app.use('/', router);
+
+app.use(function (err, req, res, next) {
+    if (err.name === 'UnauthorizedError') {
+        res.status(401).send('invalid token...');
+    }
+});
 
 // Listen to the App Engine-specified port, or 8080 otherwise
 const PORT = process.env.PORT || 8080;

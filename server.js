@@ -18,8 +18,9 @@ const Datastore = require('@google-cloud/datastore');
 
 const projectId = 'final-493';
 
-const PET = "Pet";
-const KENNEL = "Kennel";
+const PET = "Pets";
+const KENNEL = "Kennels";
+const USER = "Users";
 
 datastore = new Datastore({projectId:projectId});
 fromDatastore = function fromDatastore(item){
@@ -190,6 +191,69 @@ function set_pet_status(req, id, status){
 	      .then(() => {return key});
 	    });
     //return datastore.delete(key);
+}
+
+function post_user(email, first, last){
+	//console.log("post_pet");
+   var key = datastore.key(USER);
+	const new_pet = {"email": email, "first": first, "last": last};
+	return datastore.save({"key":key, "data":new_pet}).then(() => {return key});
+}
+
+function get_users(req){
+	// pretty much borrowed from https://gist.github.com/wolfordj/3080eeec83bdc3bcc916c3c8fcd3b383
+    var q = datastore.createQuery(USER).limit(5);
+    const results = {};
+    var prev;
+    if(Object.keys(req.query).includes("cursor")){
+    		//console.log("get_pets: if includes cursor");
+      	//console.log(req.query);
+      	prev = req.protocol + "://" + req.get("host") + req.baseUrl + "/users?cursor=" + req.query.cursor;
+      	q = q.start(req.query.cursor);
+    }
+	return datastore.runQuery(q).then( (entities) => {
+            //console.log(entities[0]);
+            results.users = entities[0].map(fromDatastore)
+            if(typeof prev !== 'undefined'){
+                results.previous = prev;
+            }
+            if(entities[1].moreResults !== Datastore.NO_MORE_RESULTS ){
+            	//console.log("get_pets: entities[1].moreResults !== Datastore.NO_MORE_RESULTS");
+                results.next = req.protocol + "://" + req.get("host") + req.baseUrl + "/users?cursor=" + entities[1].endCursor;
+            }
+          	//console.log("-----------");
+          	//console.log(results);
+	         results.users.forEach(function (arrayItem) {
+	         	arrayItem.self = req.protocol + "://" + req.get("host") + "/users/" + arrayItem.id;
+				}); 
+			return results;
+		});
+}
+
+function get_one_user(req, id){
+	const key = datastore.key([USER, parseInt(id,10)]);
+	return datastore.get(key).then( (entities) => {
+			results = entities.map(fromDatastore);
+			results[0].self = req.protocol + "://" + req.get("host") + "/users/" + results[0].id;
+			results[0].base = req.protocol + "://" + req.get("host") + "/users";
+			return results;
+		});
+}
+
+function put_user(id, email, first, last, status){
+   const key = datastore.key([USER, parseInt(id,10)]);
+   let updated_user;
+
+   if(status && status !== "")
+   {
+   	updated_user = {"email": email, "first": first, "last": last, "status": status}; 
+   }
+   else
+   {
+   	updated_user = {"email": email, "first": first, "last": last}; 
+   }
+	//console.log(updated_user);
+   return datastore.save({"key":key, "data":updated_user}).then(() => {return key});
 }
 
 /* ------------- End Model Functions ------------- */
@@ -479,6 +543,62 @@ router.delete('/pets/:pet_id/kennels/:kennel_id', function(req, res){
 });
 
 //   USERS
+
+router.get('/users', function(req, res){
+	console.log("/users -- GET");
+    const users = get_users(req)
+	.then( (users) => {
+        const accepts = req.accepts(['application/json']);
+        if(!accepts){
+            res.status(406).send('Not Acceptable');
+        } else if(accepts === 'application/json'){
+            res.status(200).json(users);
+        } else { res.status(500).send('Content type got messed up!'); }
+    });
+});
+
+router.post('/users', function(req, res){
+    if(req.get('content-type') !== 'application/json'){
+        res.status(415).send('Server only accepts application/json data.')
+    }
+    else
+    {
+    	post_user(req.body.email, req.body.first, req.body.last)
+    	.then( key => {
+        res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/users/' + key.id);
+        res.status(201).send('{ "id": ' + key.id + ' }')
+    	} );
+    }
+
+});
+
+router.get('/users/:id', function(req, res){
+	    const users = get_one_user(req, req.params.id)
+	.then( (users) => {
+        const accepts = req.accepts(['application/json']);
+        if(!accepts){
+            res.status(406).send('Not Acceptable');
+        } else if(accepts === 'application/json'){
+            res.status(200).json(users);
+        } else { res.status(500).send('Content type got messed up!'); }
+    });
+});
+
+router.put('/users/:id', function(req, res){
+    if(req.get('content-type') !== 'application/json'){
+        res.status(415).send('Server only accepts application/json data.')
+    }
+    else
+    {
+        res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/users/' + req.params.id);
+        put_user(req.params.id, req.body.email, req.body.first, req.body.last, "")
+        .then(res.status(200).end());
+    }
+
+});
+
+
+
 router.delete('/users', function(req, res){
 	res.set('Accept', "GET, POST");
    res.status(405).end();

@@ -520,7 +520,7 @@ router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
 			{
 		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
 		      .then(set_pet_status(req, req.params.pet_id, kennels[0].number))
-		      .then(res.status(200).end());
+		      .then(res.status(201).end());
 			}
 			else
 			{
@@ -529,6 +529,22 @@ router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
 			}
     	});
    });
+});
+
+router.delete('/pets/:pet_id/kennels/:kennel_id', function(req, res){
+	    const kennels = get_one_kennel(req, req.params.kennel_id)
+		.then( (kennels) => {
+			if(kennels[0].petid == "")
+			{
+				res.status(403).end();
+			}
+			else
+			{
+		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, "")
+		      .then(set_pet_status(req, req.params.pet_id, ""))
+		      .then(res.status(204).end());
+			}
+    });
 });
 
 router.get('/kennels/:id/pets', function(req, res){

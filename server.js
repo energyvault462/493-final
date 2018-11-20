@@ -15,8 +15,9 @@ const bodyParser = require('body-parser');
 
 
 const Datastore = require('@google-cloud/datastore');
+const request = require('request');
 
-const projectId = 'final-493';
+const projectId = 'final1-493';
 
 const PET = "Pets";
 const KENNEL = "Kennels";
@@ -28,11 +29,27 @@ fromDatastore = function fromDatastore(item){
     return item;
 }
 
+const jwt = require('express-jwt');
+const jwksRsa = require('jwks-rsa');
+
 
 
 const router = express.Router();
 
 app.use(bodyParser.json());
+
+const checkJwt = jwt({
+  // Dynamically provide a signing key based on the kid in the header and the singing keys provided by the JWKS endpoint.
+  secret: jwksRsa.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 5,
+    jwksUri: `https://energyvault.auth0.com/.well-known/jwks.json`
+  }),
+
+  aud: `https://energyvault.auth0.com/api/v2/`,
+  algorithms: ['RS256']
+});
 
 /* ------------- Begin Model Functions ------------- */
 function post_pet(name, breed, desc){
@@ -691,7 +708,38 @@ router.delete('/users', function(req, res){
 });
 
 
+router.post('/login', function(req, res){
+  // FINISHED
+  console.log("begin /login: " + req.body.username);
+   const username = req.body.username;
+   const password = req.body.password;
+   var options = { method: 'POST',
+   url: 'https://energyvault.auth0.com/oauth/token',
+   headers: { 'content-type': 'application/json' },
+   body:
+    { grant_type: 'password',
+      username: username,
+      password: password,
+      client_id: 'VzEIhj3W3O6sOsjCYD5Emp1VpVNX9SdN',
+      client_secret: 'u1dpjQWbtFnF9dVvVx9goOof2JDglTxmweE93dGniWpyM4oG7hVbg0km-tQ3rhsA' },
+   json: true };
+   console.log("Sending request");
+   request(options, (error, response, body) => {
+       if (error){
+            console.log("sending error");
+           res.status(500).send(error);
+       } else {
+          console.log("sending body");
+         res.send(body);
+       }
+   });
 
+});
+
+router.get('/test', checkJwt, function(req, res){
+  console.log(req.user.name);
+
+});
 
 /* ------------- End Controller Functions ------------- */
 

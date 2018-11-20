@@ -248,11 +248,16 @@ function get_users(req){
 }
 
 function get_one_user(req, id){
+  console.log("start get_one_user id: " + id);
 	const key = datastore.key([USER, parseInt(id,10)]);
 	return datastore.get(key).then( (entities) => {
 			results = entities.map(fromDatastore);
 			results[0].self = req.protocol + "://" + req.get("host") + "/users/" + results[0].id;
 			results[0].base = req.protocol + "://" + req.get("host") + "/users";
+      console.log("results:");
+      console.log(results);
+      console.log("email: " + results.email);
+      console.log("end get_one_user id: " + id);
 			return results;
 		});
 }
@@ -317,7 +322,7 @@ router.post('/pets', checkJwt, function(req, res){
     else if(!req.user.name || req.user.name === "")
     {
       console.log("post /pets Unauthorized");
-      res.status(402).send('Unauthorized');
+      res.status(401).send('Unauthorized');
     }
     else
     {
@@ -610,13 +615,18 @@ router.get('/users', function(req, res){
     });
 });
 
-router.post('/users', function(req, res){
+router.post('/users', checkJwt, function(req, res){
     if(req.get('content-type') !== 'application/json'){
         res.status(415).send('Server only accepts application/json data.')
     }
+    else if(!req.user.name || req.user.name === "")
+    {
+      console.log("post /pets Unauthorized");
+      res.status(401).send('Unauthorized');
+    }
     else
     {
-    	post_user(req.body.email, req.body.first, req.body.last)
+    	post_user(req.user.email, req.body.first, req.body.last)
     	.then( key => {
         res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/users/' + key.id);
         res.status(201).send('{ "id": ' + key.id + ' }')
@@ -625,15 +635,34 @@ router.post('/users', function(req, res){
 
 });
 
-router.get('/users/:id', function(req, res){
-	    const users = get_one_user(req, req.params.id)
+router.get('/users/:id', checkJwt, function(req, res){
+  console.log("get /users/:id start");
+  if(!req.user.name || req.user.name === "")
+  {
+      console.log("get /users 401 Unauthorized");
+      res.status(401).send('Unauthorized');
+  }
+	const users = get_one_user(req, req.params.id)
 	.then( (users) => {
+      console.log("get /users/:id users:" + users);
+      if(users[0].email != req.user.name)
+      {
+        console.log("get /users 403");
+        console.log("users.email: " + users[0].email);
+        console.log("req.user.name: " + req.user.name);
+        res.status(403).send();
+      }
+      else
+      {
+        console.log("get /users user matches");
         const accepts = req.accepts(['application/json']);
         if(!accepts){
             res.status(406).send('Not Acceptable');
         } else if(accepts === 'application/json'){
             res.status(200).json(users);
-        } else { res.status(500).send('Content type got messed up!'); }
+        } else { res.status(500).send('Content type got messed up!'); }        
+      }
+
     });
 });
 

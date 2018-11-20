@@ -52,10 +52,10 @@ const checkJwt = jwt({
 });
 
 /* ------------- Begin Model Functions ------------- */
-function post_pet(name, breed, desc){
+function post_pet(name, breed, desc, owner){
 	//console.log("post_pet");
     var key = datastore.key(PET);
-	const new_pet = {"name": name, "breed": breed, "desc": desc};
+	const new_pet = {"name": name, "breed": breed, "desc": desc, "owner": owner};
 	return datastore.save({"key":key, "data":new_pet}).then(() => {return key});
 }
 
@@ -212,7 +212,7 @@ function set_pet_status(req, id, status){
 
 function post_user(email, first, last){
 	//console.log("post_pet");
-   var key = datastore.key(USER);
+  var key = datastore.key(USER);
 	const new_pet = {"email": email, "first": first, "last": last};
 	return datastore.save({"key":key, "data":new_pet}).then(() => {return key});
 }
@@ -309,14 +309,22 @@ router.get('/pets/:id', function(req, res){
     });
 });
 
-router.post('/pets', function(req, res){
+router.post('/pets', checkJwt, function(req, res){
+  console.log(" post /pets");
     if(req.get('content-type') !== 'application/json'){
         res.status(415).send('Server only accepts application/json data.')
     }
+    else if(!req.user.name || req.user.name === "")
+    {
+      console.log("post /pets Unauthorized");
+      res.status(402).send('Unauthorized');
+    }
     else
     {
-    	post_pet(req.body.name, req.body.breed, req.body.desc)
+      console.log("post /pets authorized, continue");
+    	post_pet(req.body.name, req.body.breed, req.body.desc, req.user.name)
     	.then( key => {
+        console.log("post /pets req.protocl: " + req.protocol);
         res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/pets/' + key.id);
         res.status(201).send('{ "id": ' + key.id + ' }')
     	} );

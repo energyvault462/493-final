@@ -101,19 +101,19 @@ function get_one_pet(req, id){
 }
 
 
-function put_pet(id, name, breed, desc, status){
+function put_pet(id, name, breed, desc, owner, status){
    const key = datastore.key([PET, parseInt(id,10)]);
    let updated_pet;
-
    if(status && status !== "")
    {
-   	updated_pet = {"name": name, "breed": breed, "desc": desc, "status": status}; 
+    console.log("Status found: " + status);
+   	updated_pet = {"name": name, "breed": breed, "desc": desc, "owner": owner, "status": status}; 
    }
    else
    {
-   	updated_pet = {"name": name, "breed": breed, "desc": desc}; 
+   	updated_pet = {"name": name, "breed": breed, "desc": desc, "owner": owner}; 
    }
-	//console.log(updated_pet);
+	console.log(updated_pet);
    return datastore.save({"key":key, "data":updated_pet}).then(() => {return key});
 }
 
@@ -204,7 +204,7 @@ function set_pet_status(req, id, status){
     const key = datastore.key([PET, parseInt(id,10)]);
 	 const pets = get_one_pet(req, id)
 	.then( (pets) => {
-			put_pet(id, pets[0].name, pets[0].breed, pets[0].desc, status)
+			put_pet(id, pets[0].name, pets[0].breed, pets[0].desc, pets[0].owner, status)
 	      .then(() => {return key});
 	    });
     //return datastore.delete(key);
@@ -337,79 +337,134 @@ router.post('/pets', checkJwt, function(req, res){
 
 });
 
-router.delete('/pets/:id', function(req, res){
+router.delete('/pets/:id', checkJwt, function(req, res){
 	//console.log("delete pets " + req.params.id);
 	// TODO: FIX THIS part. it's not finding anything in filter and I have no idea why
-	var q = datastore.createQuery(KENNEL).filter('pet_id', '=', req.params.id);
-	var data = [];
-	//console.log (q);
-		return datastore.runQuery(q).then( (entities) => {
-				kennel = entities[0].map(fromDatastore)
-				kennel.forEach(function (arrayItem) {
-					data.number = arrayItem.number;
-					data.size = arrayItem.size;
-					data.desc = arrayItem.desc;
-					//put_kennel(req, req.params.id, req.body.number, req.body.size, req.body.desc, "")
-					put_kennel(req, data.number, data.size, data.desc, "");
+  if(!req.user.name || req.user.name === "")
+  {
+      res.status(401).send('Unauthorized');
+  }
+    const pets = get_one_pet(req, req.params.id)
+    .then ( (pets) => {
+      if(pets[0].owner != req.user.name)
+      {
+        console.log(pets);
+        console.log("pets[0].owner: " + pets[0].owner);
+        console.log("req.user.name: " + req.user.name);
+        res.status(403).send();
+      }
+      else
+      {
+        console.log(pets);
+        console.log("pets[0].owner: " + pets[0].owner);
+        console.log("req.user.name: " + req.user.name);
+        var q = datastore.createQuery(KENNEL).filter('pet_id', '=', req.params.id);
+        var data = [];
+        //console.log (q);
+          return datastore.runQuery(q).then( (entities) => {
+              kennel = entities[0].map(fromDatastore)
+              kennel.forEach(function (arrayItem) {
+                data.number = arrayItem.number;
+                data.size = arrayItem.size;
+                data.desc = arrayItem.desc;
+                //put_kennel(req, req.params.id, req.body.number, req.body.size, req.body.desc, "")
+                put_kennel(req, data.number, data.size, data.desc, "");
 
-				}); 
-			//return entities[0].map(fromDatastore);
-			return kennel;
-		})
-	.then(delete_pet(req.params.id).then(res.status(204).end()));
+              }); 
+            //return entities[0].map(fromDatastore);
+            return kennel;
+          })
+        .then(delete_pet(req.params.id).then(res.status(204).end()));
+      }      
+    });
+
 });
 
-router.put('/pets/:id', function(req, res){
-    if(req.get('content-type') !== 'application/json'){
-        res.status(415).send('Server only accepts application/json data.')
-    }
-    else
-    {
-        res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/pets/' + req.params.id);
-        put_pet(req.params.id, req.body.name, req.body.breed, req.body.desc, "")
-        .then(res.status(200).end());
-    }
-
-});
-
-router.patch('/pets/:id', function(req, res){
-	    const pets = get_one_pet(req, req.params.id)
-		.then( (pets) => {
-        //Get the data from this pet
-        var name = pets[0].name;
-        var breed = pets[0].breed;
-        var desc = pets[0].desc;
-        if (typeof pets[0].status  !== "undefined" && pets[0].status !== "")
-        {
-        		var status = pets[0].status;
+router.put('/pets/:id', checkJwt, function(req, res){
+  if(!req.user.name || req.user.name === "")
+  {
+      console.log("get /users 401 Unauthorized");
+      res.status(401).send('Unauthorized');
+  }
+  const pets = get_one_pet(req, req.params.id)
+  .then( (pets) => {
+      if(pets[0].owner != req.user.name)
+      {
+        res.status(403).send();
+      }
+      else
+      {
+        if(req.get('content-type') !== 'application/json'){
+            res.status(415).send('Server only accepts application/json data.')
         }
         else
         {
-        		var status = "";
+            res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/pets/' + req.params.id);
+            put_pet(req.params.id, req.body.name, req.body.breed, req.body.desc, req.body.owner, "")
+            .then(res.status(200).end());
         }
+      }
+  });
 
-        // if it's been changed, change it.
-			if(typeof req.body.name !== "undefined")
-			{
-			  name=req.body.name;
-			} 
+});
 
-			if(typeof req.body.breed !== "undefined")
-			{
-			  breed=req.body.breed;
-			} 
+router.patch('/pets/:id', checkJwt, function(req, res){
+  if(!req.user.name || req.user.name === "")
+  {
+      console.log("get /users 401 Unauthorized");
+      res.status(401).send('Unauthorized');
+  }
+	  const pets = get_one_pet(req, req.params.id)
+		.then( (pets) => {
+      if(pets[0].owner != req.user.name)
+      {
+        console.log("pets[0].owner: " + pets[0].owner);
+        console.log("req.user.name " + req.user.name);
+        res.status(403).send();
+      }
+      else
+      {
+          //Get the data from this pet
+          var name = pets[0].name;
+          var breed = pets[0].breed;
+          var desc = pets[0].desc;
+          var owner = pets[0].owner;
+          if (typeof pets[0].status  !== "undefined" && pets[0].status !== "")
+          {
+          		var status = pets[0].status;
+          }
+          else
+          {
+          		var status = "";
+          }
 
-			if(typeof req.body.desc !== "undefined")
-			{
-			  desc=req.body.desc;
-			} 
-			if(typeof req.body.status !== "undefined")
-			{
-			  status=req.body.status;
-			} 
-			res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/pets/' + req.params.id);
-	      put_pet(req.params.id, name, breed, desc, status)
-	      .then(res.status(200).end());
+          // if it's been changed, change it.
+  			if(typeof req.body.name !== "undefined")
+  			{
+  			  name=req.body.name;
+  			} 
+
+  			if(typeof req.body.breed !== "undefined")
+  			{
+  			  breed=req.body.breed;
+  			} 
+
+  			if(typeof req.body.desc !== "undefined")
+  			{
+  			  desc=req.body.desc;
+  			} 
+  			if(typeof req.body.status !== "undefined")
+  			{
+  			  status=req.body.status;
+  			} 
+        if(typeof req.body.owner !== "undefined")
+        {
+          owner=req.body.owner;
+        } 
+  			res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/pets/' + req.params.id);
+  	      put_pet(req.params.id, name, breed, desc, owner, status)
+  	      .then(res.status(200).end());
+      }
     });
 });
 
@@ -540,40 +595,65 @@ router.delete('/kennels', function(req, res){
    res.status(405).end();
 });
 
-router.put('/pets/:pet_id/kennels/:kennel_id', function(req, res){
+router.put('/pets/:pet_id/kennels/:kennel_id', checkJwt, function(req, res){
+  if(!req.user.name || req.user.name === "")
+  {
+      res.status(401).send('Unauthorized');
+  }
 	const pets = get_one_pet(req, req.params.pet_id)
 	.then ( (pets) => {
-		//console.log(pets);
-	   const kennels = get_one_kennel(req, req.params.kennel_id)
-		.then( (kennels) => {
-			if(!kennels[0].petid || kennels[0].petid === "")
-			{
-		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
-		      .then(set_pet_status(req, req.params.pet_id, kennels[0].number))
-		      .then(res.status(201).end());
-			}
-			else
-			{
-				//console.log("put /pets/:pet_id/kennels/:kennel_id  -- else for kennels[0].petid === <double quotes>")
-				res.status(403).end();
-			}
-    	});
-   });
+    if(pets[0].owner != req.user.name)
+    {
+      res.status(403).send();
+    }
+    else
+    {
+  		//console.log(pets);
+  	   const kennels = get_one_kennel(req, req.params.kennel_id)
+  		.then( (kennels) => {
+  			if(!kennels[0].petid || kennels[0].petid === "")
+  			{
+  		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, req.params.pet_id)
+  		      .then(set_pet_status(req, req.params.pet_id, kennels[0].number))
+  		      .then(res.status(201).end());
+  			}
+  			else
+  			{
+  				//console.log("put /pets/:pet_id/kennels/:kennel_id  -- else for kennels[0].petid === <double quotes>")
+  				res.status(403).end();
+  			}
+      	});
+    }
+  });
 });
 
-router.delete('/pets/:pet_id/kennels/:kennel_id', function(req, res){
-	    const kennels = get_one_kennel(req, req.params.kennel_id)
-		.then( (kennels) => {
-			if(kennels[0].petid == "")
-			{
-				res.status(403).end();
-			}
-			else
-			{
-		      put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, "")
-		      .then(set_pet_status(req, req.params.pet_id, ""))
-		      .then(res.status(204).end());
-			}
+router.delete('/pets/:pet_id/kennels/:kennel_id', checkJwt, function(req, res){
+  if(!req.user.name || req.user.name === "")
+  {
+      res.status(401).send('Unauthorized');
+  }
+    const pets = get_one_pet(req, req.params.pet_id)
+    .then ( (pets) => {
+      if(pets[0].owner != req.user.name)
+      {
+        res.status(403).send();
+      }
+      else
+      {
+        const kennels = get_one_kennel(req, req.params.kennel_id)
+        .then( (kennels) => {
+          if(kennels[0].petid == "")
+          {
+            res.status(403).end();
+          }
+          else
+          {
+              put_kennel(req, req.params.kennel_id, kennels[0].number, kennels[0].size, kennels[0].desc, "")
+              .then(set_pet_status(req, req.params.pet_id, ""))
+              .then(res.status(204).end());
+          }
+        });
+      }      
     });
 });
 
@@ -637,6 +717,10 @@ router.post('/users', checkJwt, function(req, res){
 
 router.get('/users/:id', checkJwt, function(req, res){
   console.log("get /users/:id start");
+  const accepts = req.accepts(['application/json']);
+  if(!accepts){
+    res.status(406).send('Not Acceptable'); 
+  }
   if(!req.user.name || req.user.name === "")
   {
       console.log("get /users 401 Unauthorized");
@@ -655,10 +739,7 @@ router.get('/users/:id', checkJwt, function(req, res){
       else
       {
         console.log("get /users user matches");
-        const accepts = req.accepts(['application/json']);
-        if(!accepts){
-            res.status(406).send('Not Acceptable');
-        } else if(accepts === 'application/json'){
+        if(accepts === 'application/json'){
             res.status(200).json(users);
         } else { res.status(500).send('Content type got messed up!'); }        
       }
@@ -666,22 +747,47 @@ router.get('/users/:id', checkJwt, function(req, res){
     });
 });
 
-router.put('/users/:id', function(req, res){
-    if(req.get('content-type') !== 'application/json'){
-        res.status(415).send('Server only accepts application/json data.')
-    }
+router.put('/users/:id', checkJwt, function(req, res){
+  if(!req.user.name || req.user.name === "")
+  {
+      res.status(401).send('Unauthorized');
+  }
+  if(req.get('content-type') !== 'application/json')
+  {
+      res.status(415).send('Server only accepts application/json data.')
+  }
+  const users = get_one_user(req, req.params.id)
+  .then( (users) => {
+    if(users[0].email != req.user.name)
+      {
+        res.status(403).send();
+      }
     else
     {
-        res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/users/' + req.params.id);
-        put_user(req.params.id, req.body.email, req.body.first, req.body.last, "")
-        .then(res.status(200).end());
+      res.location(req.protocol + "://" + req.get('host') + req.baseUrl + '/users/' + req.params.id);
+      put_user(req.params.id, req.body.email, req.body.first, req.body.last, "")
+      .then(res.status(200).end());
     }
-
+  });
 });
 
-router.patch('/users/:id', function(req, res){
-	    const users = get_one_user(req, req.params.id)
+router.patch('/users/:id', checkJwt, function(req, res){
+  if(!req.user.name || req.user.name === "")
+  {
+      res.status(401).send('Unauthorized');
+  }
+  if(req.get('content-type') !== 'application/json')
+  {
+      res.status(415).send('Server only accepts application/json data.')
+  }
+	  const users = get_one_user(req, req.params.id)
 		.then( (users) => {
+        console.log("users.email: " + users[0].email);
+        console.log("req.user.name: " + req.user.name);
+        if(users[0].email != req.user.name)
+        {
+          res.status(403).send();
+        }
         //Get the data from this users
         var email = users[0].email;
         var first = users[0].first;
@@ -720,23 +826,39 @@ router.patch('/users/:id', function(req, res){
     });
 });
 
-router.delete('/users/:id', function(req, res){
+router.delete('/users/:id', checkJwt, function(req, res){
 	//console.log("delete users " + req.params.id);
-	var q = datastore.createQuery(PET).filter('owner', '=', req.params.id);
-	var data = [];
-	//console.log (q);
-		return datastore.runQuery(q).then( (entities) => {
-				pet = entities[0].map(fromDatastore)
-				pet.forEach(function (arrayItem) {
-					data.name = arrayItem.name;
-					data.breed = arrayItem.breed;
-					data.desc = arrayItem.desc;
-					put_pet(req, data.name, data.breed, data.desc, "");
-				}); 
-			//return entities[0].map(fromDatastore);
-			return pet;
-		})
-	.then(delete_user(req.params.id).then(res.status(204).end()));
+  if(!req.user.name || req.user.name === "")
+  {
+      res.status(401).send('Unauthorized');
+  }
+
+    const users = get_one_user(req, req.params.id)
+    .then ( users=> {
+      if(users[0].email != req.user.name)
+      {
+        res.status(403).send();
+      }
+      else
+      {
+        var q = datastore.createQuery(PET).filter('owner', '=', req.params.id);
+        var data = [];
+        //console.log (q);
+          return datastore.runQuery(q).then( (entities) => {
+              pet = entities[0].map(fromDatastore)
+              pet.forEach(function (arrayItem) {
+                data.name = arrayItem.name;
+                data.breed = arrayItem.breed;
+                data.desc = arrayItem.desc;
+                data.owner = arrayItem.owner;
+                put_pet(req, data.name, data.breed, data.desc, "", "");
+              }); 
+            //return entities[0].map(fromDatastore);
+            return pet;
+          })
+        .then(delete_user(req.params.id).then(res.status(204).end()));
+      }      
+    });
 });
 
 router.delete('/users', function(req, res){
